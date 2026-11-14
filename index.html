@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>КОНТУР — Інженерна Розмітка</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { cad: { accent: '#38bdf8' } },
+                    fontFamily: {
+                        mono: ['Roboto Mono', 'monospace'],
+                        sans: ['Inter', 'sans-serif'],
+                        chakra: ['Chakra Petch', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Caveat:wght@400;600;700&family=Chakra+Petch:wght@400;600;700&family=Comfortaa:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@400;600;700&family=Roboto+Mono:wght@400;600;700&family=Roboto:wght@400;500;700&family=Russo+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        
+        body { overscroll-behavior-y: contain; }
+        
+        .cad-grid-bg { background-color: #0b1120; background-image: radial-gradient(rgba(56, 189, 248, 0.15) 1px, transparent 1px); background-size: 20px 20px; }
+        .tool-btn.active { background-color: #0284c7; color: #ffffff; border-color: #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.4); }
+        .toggle-btn.active { background-color: #15803d; color: #ffffff; border-color: #4ade80; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Header -->
+    <header class="min-h-[52px] bg-slate-900 border-b border-slate-800 px-3 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                <i class="fa-solid font-mono fa-compass-drafting"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm tracking-wide text-slate-100 flex items-center gap-1.5">
+                    КОНТУР <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-800 hidden sm:inline-block">PRO v8.9</span>
+                </h1>
+            </div>
+        </div>
+        <div class="flex items-center gap-1 sm:gap-2">
+            <button onclick="anton()" class="w-9 h-9 sm:w-auto sm:px-3 sm:py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1.5 transition shadow" title="Скасувати">
+                <i class="fa-solid fa-rotate-left"></i> <span class="hidden sm:inline">Скасувати</span>
+            </button>
+            <div class="h-6 w-px bg-slate-700 mx-0.5"></div>
+            <button onclick="saveProject()" class="w-9 h-9 sm:w-auto sm:px-3 sm:py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs flex items-center justify-center gap-1.5 transition shadow font-bold" title="Зберегти проєкт">
+                <i class="fa-solid fa-floppy-disk"></i> <span class="hidden sm:inline">.KON</span>
+            </button>
+            <button onclick="exportImage()" class="w-9 h-9 sm:w-auto sm:px-3 sm:py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs flex items-center justify-center gap-1.5 transition shadow font-bold" title="Експорт в PNG">
+                <i class="fa-solid fa-image"></i> <span class="hidden sm:inline">PNG</span>
+            </button>
+            <button onclick="exportPDF()" class="w-9 h-9 sm:w-auto sm:px-3 sm:py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs flex items-center justify-center gap-1.5 transition shadow font-bold" title="Експорт в PDF">
+                <i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">PDF</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Left Toolbar -->
+        <aside class="w-14 sm:w-16 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-2 space-y-2 z-20 shrink-0 overflow-y-auto pb-4">
+            <button id="tool-select" onclick="setTool('select')" class="tool-btn active w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Виділення"><i class="fa-solid fa-arrow-pointer"></i></button>
+            <button id="tool-pan" onclick="setTool('pan')" class="tool-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Рука (Панорама)"><i class="fa-solid fa-hand"></i></button>
+            
+            <div class="w-8 border-t border-slate-800 my-1"></div>
+
+            <button id="tool-dimension" onclick="setTool('dimension')" class="tool-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Розмір"><i class="fa-solid fa-ruler-combined"></i></button>
+            <button id="tool-angle" onclick="setTool('angle')" class="tool-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Кутомір"><i class="fa-solid fa-chart-pie"></i></button>
+            <button id="tool-leader" onclick="setTool('leader')" class="tool-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Виноска"><i class="fa-solid fa-arrow-right-to-city"></i></button>
+            <button id="tool-textbox" onclick="setTool('textbox')" class="tool-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Текст"><i class="fa-solid fa-font"></i></button>
+            <button id="tool-stamp" onclick="setTool('stamp')" class="tool-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Штамп"><i class="fa-solid fa-stamp"></i></button>
+
+            <div class="w-8 border-t border-slate-800 my-1"></div>
+            
+            <button id="btn-magnifier" onclick="toggleMagnifier()" class="toggle-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Опціональна Лупа"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <button id="btn-orto" onclick="toggleOrtoMode()" class="toggle-btn w-11 h-11 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center text-lg transition" title="Магніт (Shift)"><i class="fa-solid fa-magnet"></i></button>
+
+            <button onclick="deleteSelected()" class="w-11 h-11 mt-auto rounded-xl border border-slate-800 text-red-400 hover:bg-red-950/50 flex items-center justify-center text-lg transition" title="Видалити"><i class="fa-solid fa-trash-can"></i></button>
+        </aside>
+
+        <!-- Canvas Area -->
+        <main id="viewport" class="flex-1 relative cad-grid-bg overflow-hidden transition-colors duration-200 w-full h-full">
+            <div id="canvas-container" class="absolute inset-0"></div>
+            
+            <!-- Magnifier (Лупа) -->
+            <canvas id="mag-canvas" width="140" height="140" class="hidden absolute rounded-full border-[3px] border-sky-400 shadow-[0_4px_20px_rgba(0,0,0,0.8)] pointer-events-none z-50 bg-[#0b1120]"></canvas>
+
+            <!-- Zoom Controls -->
+            <div class="absolute bottom-4 right-4 flex flex-col sm:flex-row items-center bg-slate-900/90 backdrop-blur border border-slate-700 rounded-lg shadow-xl overflow-hidden z-30">
+                <button onclick="zoomStage(0.8)" class="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-sky-400 border-b sm:border-b-0 sm:border-r border-slate-700 transition"><i class="fa-solid fa-minus"></i></button>
+                <button onclick="fitToScreen()" class="h-10 sm:h-9 px-3 text-xs font-mono text-slate-300 hover:bg-slate-800 border-b sm:border-b-0 sm:border-r border-slate-700 transition" title="Вмістити">FIT</button>
+                <button onclick="zoomStage(1.2)" class="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-sky-400 transition"><i class="fa-solid fa-plus"></i></button>
+            </div>
+
+            <!-- Start Overlay -->
+            <div id="start-overlay" class="absolute inset-0 z-40 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 overflow-y-auto">
+                <h2 class="text-2xl sm:text-3xl font-bold text-white mb-8 text-center mt-auto sm:mt-0">Почати роботу</h2>
+                
+                <div class="flex flex-col sm:flex-row gap-6 w-full max-w-2xl justify-center mb-auto sm:mb-0">
+                    <label for="fileInputImg" class="flex-1 bg-slate-900 border-2 border-dashed border-sky-600/50 hover:border-sky-500 rounded-2xl p-8 flex flex-col items-center cursor-pointer hover:bg-slate-800 transition shadow-2xl shadow-sky-900/20">
+                        <div class="text-5xl text-sky-500 mb-4"><i class="fa-solid fa-image"></i></div>
+                        <h3 class="text-xl font-bold text-white mb-2 text-center">Нове креслення</h3>
+                        <p class="text-sm text-slate-400 text-center">З фотографії або скріншоту</p>
+                    </label>
+                    <input type="file" id="fileInputImg" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                    
+                    <label for="fileInputKov" class="flex-1 bg-slate-900 border-2 border-dashed border-indigo-600/50 hover:border-indigo-500 rounded-2xl p-8 flex flex-col items-center cursor-pointer hover:bg-slate-800 transition shadow-2xl shadow-indigo-900/20">
+                        <div class="text-5xl text-indigo-500 mb-4"><i class="fa-solid fa-folder-open"></i></div>
+                        <h3 class="text-xl font-bold text-white mb-2 text-center">Відкрити проєкт</h3>
+                        <p class="text-sm text-slate-400 text-center">Завантажити файл .kon / .kov</p>
+                    </label>
+                    <input type="file" id="fileInputKov" accept=".kov,.kon" class="hidden" onchange="loadProject(event)">
+                </div>
+            </div>
+            
+            <!-- Mobile Overlay Background -->
+            <div id="mobile-dimmer" class="hidden sm:hidden absolute inset-0 z-40 bg-black/50 backdrop-blur-sm" onclick="deselectAll()"></div>
+        </main>
+
+        <!-- Right Inspector -->
+        <aside id="inspector-panel" class="absolute sm:relative right-0 top-0 bottom-0 w-72 sm:w-80 bg-slate-900 border-l border-slate-800 flex flex-col z-50 transform translate-x-full sm:translate-x-0 transition-transform duration-300 text-xs shadow-2xl sm:shadow-none">
+            
+            <div class="p-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+                <h3 id="inspector-title" class="font-bold text-sky-400 text-sm uppercase tracking-wider">Властивості</h3>
+                <button class="sm:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white rounded bg-slate-800" onclick="deselectAll()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- TAB 1: ELEMENT PROPERTIES -->
+            <div id="tab-content-element" class="flex-1 overflow-y-auto p-4 space-y-5">
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-slate-400 block mb-1">Текст написів</label>
+                        <textarea id="prop-text" rows="2" oninput="updateActiveObjectProps(false)" onchange="saveState()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white placeholder-slate-600 focus:border-sky-500 outline-none" placeholder="Введіть текст..."></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="text-slate-400 block mb-1">Шрифт</label>
+                        <select id="prop-fontfamily" onchange="updateActiveObjectProps()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none">
+                            <option value="Chakra Petch">Chakra Petch (Техно)</option>
+                            <option value="Roboto">Roboto (Універсал)</option>
+                            <option value="Montserrat">Montserrat (Широкий)</option>
+                            <option value="Inter">Inter (Чіткий)</option>
+                            <option value="Open Sans">Open Sans (Класика)</option>
+                            <option value="Caveat">Caveat (Рукописний)</option>
+                            <option value="Russo One">Russo One (Масивний)</option>
+                            <option value="Comfortaa">Comfortaa (Округлий)</option>
+                            <option value="Playfair Display">Playfair (Засічки)</option>
+                            <option value="Barlow Condensed">Barlow Cond. (Вузький)</option>
+                            <option value="Roboto Mono">Roboto Mono (Код)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                            <label class="text-slate-400 block mb-1">Текст: <span id="val-font-size" class="text-sky-400 font-bold">15</span>px</label>
+                            <input type="range" id="prop-font-size" min="8" max="72" step="1" value="15" oninput="document.getElementById('val-font-size').innerText=this.value; updateActiveObjectProps(false);" onchange="saveState()" class="w-full">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                            <label class="text-slate-400 block mb-1">Відступи: <span id="val-padding" class="text-sky-400 font-bold">8</span>px</label>
+                            <input type="range" id="prop-padding" min="2" max="24" step="1" value="8" oninput="document.getElementById('val-padding').innerText=this.value; updateActiveObjectProps(false);" onchange="saveState()" class="w-full">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="border-t border-slate-800/80"></div>
+
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Форма рамки</label>
+                            <select id="prop-shape" onchange="updateActiveObjectProps()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none">
+                                <option value="round">Заокруглена</option>
+                                <option value="rect">Квадратна</option>
+                                <option value="pill">Пігулка</option>
+                                <option value="circle">Коло</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Стиль лінії</label>
+                            <select id="prop-line-style" onchange="updateActiveObjectProps()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none">
+                                <option value="solid">Суцільна</option>
+                                <option value="dashed">Пунктирна</option>
+                                <option value="dotted">Штрих</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                            <label class="text-slate-400 block mb-1">Лінія: <span id="val-line-width" class="text-sky-400 font-bold">2</span>px</label>
+                            <input type="range" id="prop-line-width" min="0.5" max="10" step="0.5" value="2" oninput="document.getElementById('val-line-width').innerText=this.value; updateActiveObjectProps(false);" onchange="saveState()" class="w-full">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                            <label class="text-slate-400 block mb-1">Стрілка: <span id="val-arrow-size" class="text-sky-400 font-bold">1</span>x</label>
+                            <input type="range" id="prop-arrow-size" min="0.25" max="3" step="0.25" value="1" oninput="document.getElementById('val-arrow-size').innerText=this.value; updateActiveObjectProps(false);" onchange="saveState()" class="w-full">
+                        </div>
+                    </div>
+
+                    <div id="angle-radius-block" class="bg-slate-950 p-2 rounded-lg border border-slate-800 hidden">
+                        <label class="text-slate-400 block mb-1">Радіус кутоміра: <span id="val-angle-rad" class="text-sky-400 font-bold">50</span>px</label>
+                        <input type="range" id="prop-angle-rad" min="20" max="200" step="5" value="50" oninput="document.getElementById('val-angle-rad').innerText=this.value; updateActiveObjectProps(false);" onchange="saveState()" class="w-full">
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-800/80"></div>
+
+                <div class="space-y-3">
+                    <h4 class="font-bold text-slate-500 mb-2">КОЛЬОРИ ОБ'ЄКТА</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex flex-col items-center">
+                            <label class="text-slate-400 block mb-2 w-full text-center">Лінії / Рамка</label>
+                            <input type="color" id="prop-line-color" value="#38bdf8" oninput="updateActiveObjectProps(false)" onchange="saveState()" class="w-full h-10 bg-transparent rounded cursor-pointer border-none p-0">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex flex-col items-center">
+                            <label class="text-slate-400 block mb-2 w-full text-center">Текст</label>
+                            <input type="color" id="prop-text-color" value="#ffffff" oninput="updateActiveObjectProps(false)" onchange="saveState()" class="w-full h-10 bg-transparent rounded cursor-pointer border-none p-0">
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-slate-400">Фон підкладки</label>
+                            <input type="color" id="prop-bg-color" value="#0f172a" oninput="updateActiveObjectProps(false)" onchange="saveState()" class="w-8 h-8 rounded cursor-pointer border-none p-0 bg-transparent">
+                        </div>
+                        <label class="text-slate-500 block mb-1 mt-2 text-[10px] uppercase">Прозорість фону</label>
+                        <input type="range" id="prop-bg-alpha" min="0" max="1" step="0.1" value="0.9" oninput="updateActiveObjectProps(false)" onchange="saveState()" class="w-full">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: STAMP SETTINGS -->
+            <div id="tab-content-stamp" class="hidden flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-3">
+                    <label class="text-slate-400 block">Стиль рамки</label>
+                    <select id="stamp-line-type" onchange="updateActiveStampProps()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none">
+                        <option value="solid">Суцільна</option>
+                        <option value="dashed">Пунктирна</option>
+                    </select>
+                    
+                    <label class="text-slate-400 block mt-2">Розмір тексту: <span id="val-stamp-fs" class="text-sky-400 font-bold">13</span> pt</label>
+                    <input type="range" id="stamp-font-size" min="9" max="18" step="1" value="13" oninput="updateActiveStampProps(false)" onchange="saveState()" class="w-full">
+
+                    <label class="text-slate-400 block mt-2">Колір тексту та ліній</label>
+                    <input type="color" id="stamp-color" value="#000000" oninput="updateActiveStampProps(false)" onchange="saveState()" class="w-full h-10 rounded cursor-pointer border-none bg-transparent">
+
+                    <label class="text-slate-400 block mt-2">Прозорість фону</label>
+                    <input type="range" id="stamp-alpha" min="0" max="1" step="0.1" value="1.0" oninput="updateActiveStampProps(false)" onchange="saveState()" class="w-full">
+                </div>
+
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-3">
+                    <h4 class="font-bold text-slate-500 mb-1">ЗАПОВНЕННЯ ШТАМПА</h4>
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase">1. Назва або локація</span>
+                        <input type="text" id="stamp-proj" value="«Назва»" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none mt-0.5" oninput="updateActiveStampProps(false)" onchange="saveState()">
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase">2. Тип об'єкту</span>
+                        <input type="text" id="stamp-obj" value="Бліндаж / Траншея" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none mt-0.5" oninput="updateActiveStampProps(false)" onchange="saveState()">
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase">3. Габарити</span>
+                        <input type="text" id="stamp-dims" value="L x W x H" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none mt-0.5" oninput="updateActiveStampProps(false)" onchange="saveState()">
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase">4. Виконавець</span>
+                        <input type="text" id="stamp-dev" value="«Підрозділ»" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none mt-0.5" oninput="updateActiveStampProps(false)" onchange="saveState()">
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        let stage, mainLayer, bgLayer, handlesLayer, transformer;
+        
+        let activeTool = 'select';
+        let isDrawing = false;
+        let tempShape = null;
+        let drawStartPoint = null;
+        let undoStack = [];
+        let activeSelectedNode = null;
+        let activeHandleAnchors = [];
+
+        // Magnifier Settings
+        const MAG_SIZE = 140;
+        const MAG_ZOOM = 2;
+        let magnifierEnabled = false;
+
+        let angleStep = 0, angleVertex = null, angleP1 = null; 
+        let isShiftPressed = false;
+        let ortoEnabled = false;
+
+        let defLineColor = '#38bdf8';
+        let defTextColor = '#ffffff';
+        let defBgColor = '#0f172a';
+        let defBgAlpha = 0.9;
+        let defFont = 'Chakra Petch';
+        let defFontSize = 15;
+        let defPadding = 8;
+        let defShape = 'round';
+        let defLineStyle = 'solid';
+        let defLineWidth = 2;
+        let defArrowSize = 1;
+        let defAngleRadius = 50;
+
+        let imgOrigWidth = 1000;
+        let imgOrigHeight = 1000;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('viewport');
+            
+            stage = new Konva.Stage({ 
+                container: 'canvas-container', 
+                width: container.clientWidth, 
+                height: container.clientHeight 
+            });
+            
+            bgLayer = new Konva.Layer();
+            mainLayer = new Konva.Layer();
+            handlesLayer = new Konva.Layer();
+            
+            stage.add(bgLayer); 
+            stage.add(mainLayer); 
+            stage.add(handlesLayer);
+
+            transformer = new Konva.Transformer({ 
+                borderStroke: '#38bdf8', anchorSize: 16, anchorStroke: '#38bdf8', anchorFill: '#0f172a', rotateEnabled: false 
+            });
+            handlesLayer.add(transformer);
+
+            stage.on('mousedown touchstart', handleMouseDown);
+            stage.on('mousemove touchmove', handleMouseMove);
+            stage.on('mouseup touchend', handleMouseUp);
+            stage.on('click tap', handleStageClick);
+            
+            stage.on('wheel', (e) => {
+                e.evt.preventDefault();
+                const scaleBy = 1.05; 
+                const oldScale = stage.scaleX(); 
+                const pointer = stage.getPointerPosition();
+                
+                const mousePointTo = { x: (pointer.x - stage.x()) / oldScale, y: (pointer.y - stage.y()) / oldScale };
+                const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+                
+                if (newScale < 0.05 || newScale > 20) return;
+                
+                stage.scale({ x: newScale, y: newScale });
+                stage.position({ x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale });
+                
+                stage.batchDraw();
+            });
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                if (e.key === 'Shift') isShiftPressed = true;
+                if (e.code === 'Space') { e.preventDefault(); stage.draggable(true); document.getElementById('viewport').style.cursor = 'grab'; }
+                if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); anton(); }
+                if (e.key === 'Escape') resetAngleCreation();
+                if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (e.key === 'Shift') isShiftPressed = false;
+                if (e.code === 'Space' && activeTool !== 'pan') { stage.draggable(false); document.getElementById('viewport').style.cursor = 'default'; }
+            });
+            
+            window.addEventListener('blur', () => { isShiftPressed = false; });
+
+            window.addEventListener('resize', () => {
+                stage.width(container.clientWidth);
+                stage.height(container.clientHeight);
+                stage.batchDraw();
+            });
+        });
+
+        // ---------------- MAGNIFIER (ЛУПА) ----------------
+        function toggleMagnifier() {
+            magnifierEnabled = !magnifierEnabled;
+            document.getElementById('btn-magnifier').classList.toggle('active', magnifierEnabled);
+            if (!magnifierEnabled) {
+                document.getElementById('mag-canvas').classList.add('hidden');
+            }
+        }
+
+        function updateMagnifier(logicalPos) {
+            if (!magnifierEnabled || !logicalPos) return;
+            const magCanvas = document.getElementById('mag-canvas');
+            
+            const absX = logicalPos.x * stage.scaleX() + stage.x();
+            const absY = logicalPos.y * stage.scaleY() + stage.y();
+
+            let offsetX = -70;
+            let offsetY = -160; 
+            if (absY < 180) offsetY = 40; 
+
+            magCanvas.style.left = absX + 'px';
+            magCanvas.style.top = absY + 'px';
+            magCanvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+            const ctx = magCanvas.getContext('2d');
+            ctx.clearRect(0, 0, MAG_SIZE, MAG_SIZE);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, MAG_SIZE, MAG_SIZE);
+
+            [bgLayer, mainLayer].forEach(layer => {
+                if(layer.getChildren().length === 0) return;
+                const canvasObj = layer.getCanvas();
+                if(!canvasObj || !canvasObj._canvas) return;
+                const canvas = canvasObj._canvas;
+                const pixelRatio = canvasObj.getPixelRatio();
+                
+                const physX = absX * pixelRatio;
+                const physY = absY * pixelRatio;
+                const physCaptureSize = (MAG_SIZE / MAG_ZOOM) * pixelRatio;
+                
+                ctx.globalAlpha = layer === mainLayer ? 0.4 : 1.0;
+                
+                ctx.drawImage(
+                    canvas,
+                    physX - (physCaptureSize / 2), physY - (physCaptureSize / 2), physCaptureSize, physCaptureSize,
+                    0, 0, MAG_SIZE, MAG_SIZE
+                );
+            });
+
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(MAG_SIZE/2 - 10, MAG_SIZE/2);
+            ctx.lineTo(MAG_SIZE/2 + 10, MAG_SIZE/2);
+            ctx.moveTo(MAG_SIZE/2, MAG_SIZE/2 - 10);
+            ctx.lineTo(MAG_SIZE/2, MAG_SIZE/2 + 10);
+            ctx.stroke();
+        }
+
+        // ---------------- FILE / PROJECT IO ----------------
+        function handleFileSelect(e) {
+            const file = e.target.files[0]; 
+            e.target.value = ''; 
+            if(!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const img = new Image();
+                img.onload = () => {
+                    document.getElementById('start-overlay').style.display = 'none';
+                    bgLayer.destroyChildren(); mainLayer.destroyChildren(); deselectAll(); undoStack = [];
+                    imgOrigWidth = img.width; imgOrigHeight = img.height;
+                    const kImg = new Konva.Image({ image: img, width: img.width, height: img.height, name: 'bg-image' });
+                    bgLayer.add(kImg); 
+                    fitToScreen(); saveState(); 
+                };
+                img.src = ev.target.result;
+            }; 
+            reader.readAsDataURL(file);
+        }
+
+        function saveProject() {
+            deselectAll();
+            if(!bgLayer.findOne('.bg-image')) { alert("Спочатку завантажте креслення!"); return; }
+            const projectData = {
+                version: '8.9', width: imgOrigWidth, height: imgOrigHeight,
+                bgSrc: bgLayer.findOne('.bg-image').image().src, mainLayer: mainLayer.toJSON()
+            };
+            const blob = new Blob([JSON.stringify(projectData)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'Контур_Проєкт.kon';
+            a.click(); URL.revokeObjectURL(url);
+        }
+
+        function loadProject(e) {
+            const file = e.target.files[0]; e.target.value = ''; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    document.getElementById('start-overlay').style.display = 'none';
+                    bgLayer.destroyChildren(); mainLayer.destroyChildren(); deselectAll(); undoStack = [];
+                    imgOrigWidth = data.width || 1000; imgOrigHeight = data.height || 1000;
+                    if (data.bgSrc) {
+                        const img = new Image();
+                        img.onload = () => {
+                            const kImg = new Konva.Image({ image: img, width: imgOrigWidth, height: imgOrigHeight, name: 'bg-image' });
+                            bgLayer.add(kImg); bgLayer.draw(); fitToScreen();
+                        };
+                        img.src = data.bgSrc;
+                    }
+                    if (data.mainLayer) {
+                        const tempLayer = Konva.Node.create(data.mainLayer);
+                        const children = tempLayer.getChildren().slice();
+                        children.forEach(node => {
+                            node.moveTo(mainLayer);
+                            makeGroupInteractive(node);
+                        });
+                        tempLayer.destroy();
+                        mainLayer.draw(); saveState();
+                    }
+                } catch (err) { alert('Помилка завантаження файлу проєкту!'); }
+            };
+            reader.readAsText(file);
+        }
+
+        // ---------------- VIEW CONTROLS ----------------
+        function zoomStage(factor) {
+            const oldScale = stage.scaleX(); const newScale = oldScale * factor; 
+            if (newScale < 0.05 || newScale > 20) return;
+            const center = { x: stage.width() / 2, y: stage.height() / 2 };
+            const mousePointTo = { x: (center.x - stage.x()) / oldScale, y: (center.y - stage.y()) / oldScale };
+            stage.scale({ x: newScale, y: newScale }); 
+            stage.position({ x: center.x - mousePointTo.x * newScale, y: center.y - mousePointTo.y * newScale });
+            stage.batchDraw();
+        }
+        
+        function fitToScreen() {
+            if(!bgLayer.getChildren().length) return;
+            const container = document.getElementById('viewport');
+            const padding = 40;
+            const scale = Math.min((container.clientWidth - padding) / imgOrigWidth, (container.clientHeight - padding) / imgOrigHeight);
+            stage.scale({ x: scale, y: scale });
+            stage.position({ x: (container.clientWidth - (imgOrigWidth * scale)) / 2, y: (container.clientHeight - (imgOrigHeight * scale)) / 2 });
+            stage.batchDraw();
+        }
+
+        // ---------------- UI CONTROLS ----------------
+        function setTool(tool) {
+            activeTool = tool; isDrawing = false; tempShape = null; resetAngleCreation(); deselectAll();
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('tool-' + tool);
+            if (btn) btn.classList.add('active');
+            
+            if (tool === 'pan') { stage.draggable(true); document.getElementById('viewport').style.cursor = 'grab'; } 
+            else { stage.draggable(false); document.getElementById('viewport').style.cursor = 'crosshair'; }
+            if (tool === 'stamp') switchRightTab('stamp'); else switchRightTab('element');
+        }
+
+        function switchRightTab(tab) {
+            if (tab === 'stamp') {
+                document.getElementById('tab-content-stamp').style.display = 'block'; document.getElementById('tab-content-element').style.display = 'none';
+                document.getElementById('inspector-title').innerText = 'ШТАМП КРЕСЛЕННЯ'; document.getElementById('inspector-title').className = 'font-bold text-yellow-500 text-sm uppercase tracking-wider';
+            } else {
+                document.getElementById('tab-content-element').style.display = 'block'; document.getElementById('tab-content-stamp').style.display = 'none';
+                document.getElementById('inspector-title').innerText = 'ВЛАСТИВОСТІ'; document.getElementById('inspector-title').className = 'font-bold text-sky-400 text-sm uppercase tracking-wider';
+            }
+        }
+
+        function toggleMobileInspector(show) {
+            const panel = document.getElementById('inspector-panel'); const dimmer = document.getElementById('mobile-dimmer');
+            if (show) { panel.classList.remove('translate-x-full'); dimmer.classList.remove('hidden'); } 
+            else { panel.classList.add('translate-x-full'); dimmer.classList.add('hidden'); }
+        }
+
+        function toggleOrtoMode() { ortoEnabled = !ortoEnabled; document.getElementById('btn-orto').classList.toggle('active'); }
+
+        // ---------------- UNDO ----------------
+        function saveState() { 
+            const json = mainLayer.toJSON();
+            if (undoStack.length === 0 || undoStack[undoStack.length - 1] !== json) undoStack.push(json);
+        }
+        
+        function anton() { 
+            if(undoStack.length > 1) { 
+                undoStack.pop(); 
+                const previousState = undoStack[undoStack.length - 1]; 
+                mainLayer.destroyChildren(); 
+                
+                const tempLayer = Konva.Node.create(previousState);
+                const children = tempLayer.getChildren().slice();
+                children.forEach(node => { 
+                    node.moveTo(mainLayer); 
+                    makeGroupInteractive(node); 
+                });
+                tempLayer.destroy();
+                
+                deselectAll(); mainLayer.draw(); handlesLayer.draw();
+            } 
+        }
+
+        // ---------------- DRAWING LOGIC ----------------
+        function getDashArray(style) { if (style === 'dashed') return [12, 8]; if (style === 'dotted') return [4, 6]; return []; }
+
+        function getSnapPosition(startPos, currentPos) {
+            if (!startPos) return currentPos;
+            let dx = currentPos.x - startPos.x, dy = currentPos.y - startPos.y;
+            if (isShiftPressed || ortoEnabled) {
+                let step = Math.PI / 12; let snappedAngle = Math.round(Math.atan2(dy, dx) / step) * step; let dist = Math.hypot(dx, dy);
+                return { x: startPos.x + dist * Math.cos(snappedAngle), y: startPos.y + dist * Math.sin(snappedAngle) };
+            }
+            return currentPos;
+        }
+
+        function handleMouseDown(e) {
+            if (['select', 'pan', 'angle', 'textbox', 'stamp'].includes(activeTool)) return;
+            if (e.target.getParent() && e.target.getParent().name() === 'annotation-group') return; 
+
+            const pos = stage.getRelativePointerPosition();
+            isDrawing = true; drawStartPoint = pos;
+
+            if (magnifierEnabled) {
+                document.getElementById('mag-canvas').classList.remove('hidden');
+                updateMagnifier(drawStartPoint);
+            }
+
+            if (['dimension', 'leader'].includes(activeTool)) { 
+                tempShape = new Konva.Group({ name: 'annotation-group' }); setGroupDefaults(tempShape); mainLayer.add(tempShape); 
+            }
+        }
+
+        function handleMouseMove(e) {
+            const currentPos = stage.getRelativePointerPosition(); 
+            if (!currentPos) return;
+
+            if (activeTool === 'angle' && angleStep > 0 && tempShape && angleVertex) {
+                const snapCurrent = getSnapPosition(angleVertex, currentPos);
+                if (angleStep === 1) updateAngleShape(tempShape, angleVertex, snapCurrent, snapCurrent); 
+                else if (angleStep === 2 && angleP1) updateAngleShape(tempShape, angleVertex, angleP1, snapCurrent); 
+                mainLayer.batchDraw(); 
+                if (magnifierEnabled) updateMagnifier(snapCurrent);
+                return;
+            }
+
+            if (!isDrawing || !tempShape || !drawStartPoint) return;
+
+            const snapCurrent = getSnapPosition(drawStartPoint, currentPos);
+
+            if (activeTool === 'dimension') {
+                const distPx = Math.hypot(snapCurrent.x - drawStartPoint.x, snapCurrent.y - drawStartPoint.y);
+                updateDimensionShape(tempShape, drawStartPoint, snapCurrent, document.getElementById('prop-text').value || `${Math.round(distPx)} mm`);
+            } else if (activeTool === 'leader') {
+                updateLeaderShape(tempShape, drawStartPoint, snapCurrent, document.getElementById('prop-text').value || 'Вказівка');
+            }
+            
+            mainLayer.batchDraw();
+            if (magnifierEnabled) updateMagnifier(snapCurrent);
+        }
+
+        function handleMouseUp(e) {
+            document.getElementById('mag-canvas').classList.add('hidden');
+            if (['angle', 'select', 'pan', 'textbox', 'stamp'].includes(activeTool) || !isDrawing) return;
+            isDrawing = false;
+            
+            if (tempShape) { 
+                tempShape.setAttr('cadType', activeTool); makeGroupInteractive(tempShape); selectNode(tempShape); saveState(); tempShape = null; 
+            }
+            drawStartPoint = null;
+        }
+
+        function handleStageClick(e) {
+            if (activeTool === 'pan' || activeTool === 'select') {
+                if (e.target === stage || e.target.hasName('bg-image') || e.target.hasName('bg-rect')) deselectAll(); return;
+            }
+            
+            if (e.target.getParent() && e.target.getParent().name() === 'annotation-group' && !isDrawing && activeTool !== 'angle') return;
+
+            const pos = stage.getRelativePointerPosition();
+
+            if (activeTool === 'textbox') { deselectAll(); createTextBox(pos.x, pos.y, 'Текст'); } 
+            else if (activeTool === 'angle') { handleAngleClick(pos); } 
+            else if (activeTool === 'stamp') { createEngineeringStamp(pos); }
+        }
+
+        // ---------------- SHAPES ----------------
+        function setGroupDefaults(group) {
+            group.setAttr('cadLineColor', document.getElementById('prop-line-color').value || defLineColor);
+            group.setAttr('cadTextColor', document.getElementById('prop-text-color').value || defTextColor);
+            group.setAttr('cadBgColor', document.getElementById('prop-bg-color').value || defBgColor);
+            group.setAttr('cadBgAlpha', document.getElementById('prop-bg-alpha').value || defBgAlpha);
+            group.setAttr('cadFontFamily', document.getElementById('prop-fontfamily').value || defFont);
+            group.setAttr('cadFontSize', document.getElementById('prop-font-size').value || defFontSize);
+            group.setAttr('cadPadding', document.getElementById('prop-padding').value || defPadding);
+            group.setAttr('cadShape', document.getElementById('prop-shape').value || defShape);
+            group.setAttr('cadLineStyle', document.getElementById('prop-line-style').value || defLineStyle);
+            group.setAttr('cadLineWidth', document.getElementById('prop-line-width').value || defLineWidth);
+            group.setAttr('cadArrowSize', document.getElementById('prop-arrow-size').value || defArrowSize);
+            group.setAttr('cadAngleRad', document.getElementById('prop-angle-rad').value || defAngleRadius);
+        }
+
+        function createFramedLabel(textVal, lineColor, textColor, bgColor, bgAlpha, fontFam, shapeType, paddingVal, lineWidthVal, fontSizeVal) {
+            const pad = parseInt(paddingVal); const lw = parseFloat(lineWidthVal); const fSize = parseInt(fontSizeVal);
+            const grp = new Konva.Group();
+            const txt = new Konva.Text({ text: textVal, fontSize: fSize, fontFamily: fontFam, fontStyle: 'bold', fill: textColor, padding: pad });
+            
+            let frame;
+            if (shapeType === 'circle') {
+                const radius = Math.hypot(txt.width(), txt.height()) / 2;
+                frame = new Konva.Circle({ radius: radius, fill: bgColor, opacity: parseFloat(bgAlpha), stroke: lineColor, strokeWidth: lw });
+                txt.offsetX(txt.width()/2); txt.offsetY(txt.height()/2);
+            } else {
+                let cornerRad = 0; if (shapeType === 'round') cornerRad = 6; else if (shapeType === 'pill') cornerRad = txt.height() / 2;
+                frame = new Konva.Rect({ width: txt.width(), height: txt.height(), fill: bgColor, opacity: parseFloat(bgAlpha), stroke: lineColor, strokeWidth: lw, cornerRadius: cornerRad });
+                txt.offsetX(txt.width()/2); txt.offsetY(txt.height()/2); frame.offsetX(txt.width()/2); frame.offsetY(txt.height()/2);
+            }
+            grp.add(frame); grp.add(txt); return grp;
+        }
+
+        function updateDimensionShape(group, p1, p2, textVal) {
+            group.destroyChildren(); 
+            const lCol = group.getAttr('cadLineColor'); const tCol = group.getAttr('cadTextColor');
+            const bgCol = group.getAttr('cadBgColor'); const bgA = group.getAttr('cadBgAlpha');
+            const font = group.getAttr('cadFontFamily'); const pad = group.getAttr('cadPadding');
+            const lw = parseFloat(group.getAttr('cadLineWidth')); const fSize = group.getAttr('cadFontSize');
+            const aSize = parseFloat(group.getAttr('cadArrowSize'));
+            
+            group.setAttr('p1', p1); group.setAttr('p2', p2); group.setAttr('cadText', textVal);
+            
+            group.add(new Konva.Arrow({ 
+                points: [p1.x, p1.y, p2.x, p2.y], pointerLength: (10 + lw*2) * aSize, pointerWidth: (8 + lw) * aSize, pointerAtBeginning: true, 
+                stroke: lCol, fill: lCol, strokeWidth: lw, hitStrokeWidth: 25, dash: getDashArray(group.getAttr('cadLineStyle')) 
+            }));
+            const labelGroup = createFramedLabel(textVal, lCol, tCol, bgCol, bgA, font, group.getAttr('cadShape'), pad, lw, fSize);
+            labelGroup.position({ x: p1.x + (p2.x-p1.x)*0.5, y: p1.y + (p2.y-p1.y)*0.5 });
+            group.add(labelGroup);
+        }
+
+        function updateLeaderShape(group, p1, p2, textVal) {
+            group.destroyChildren(); 
+            const lCol = group.getAttr('cadLineColor'); const tCol = group.getAttr('cadTextColor');
+            const bgCol = group.getAttr('cadBgColor'); const bgA = group.getAttr('cadBgAlpha');
+            const font = group.getAttr('cadFontFamily'); const pad = group.getAttr('cadPadding');
+            const lw = parseFloat(group.getAttr('cadLineWidth')); const fSize = group.getAttr('cadFontSize');
+            const aSize = parseFloat(group.getAttr('cadArrowSize'));
+
+            group.setAttr('p1', p1); group.setAttr('p2', p2); group.setAttr('cadText', textVal);
+            
+            group.add(new Konva.Arrow({ 
+                points: [p2.x, p2.y, p1.x, p1.y], pointerLength: (10 + lw*2) * aSize, pointerWidth: (8 + lw) * aSize, 
+                stroke: lCol, fill: lCol, strokeWidth: lw, hitStrokeWidth: 25, dash: getDashArray(group.getAttr('cadLineStyle')) 
+            }));
+            const labelGroup = createFramedLabel(textVal, lCol, tCol, bgCol, bgA, font, group.getAttr('cadShape'), pad, lw, fSize);
+            labelGroup.position({ x: p2.x, y: p2.y });
+            group.add(labelGroup);
+        }
+
+        function createTextBox(x, y, content) {
+            const group = new Konva.Group({ x: x, y: y, name: 'annotation-group' });
+            group.setAttr('cadType', 'textbox'); group.setAttr('cadText', content); setGroupDefaults(group);
+            group.add(createFramedLabel(content, group.getAttr('cadLineColor'), group.getAttr('cadTextColor'), group.getAttr('cadBgColor'), group.getAttr('cadBgAlpha'), group.getAttr('cadFontFamily'), group.getAttr('cadShape'), group.getAttr('cadPadding'), group.getAttr('cadLineWidth'), group.getAttr('cadFontSize')));
+            setTool('select'); makeGroupInteractive(group); mainLayer.add(group); selectNode(group); saveState(); 
+        }
+
+        function resetAngleCreation() { 
+            angleStep = 0; angleVertex = null; angleP1 = null; 
+            document.getElementById('mag-canvas').classList.add('hidden');
+            if(tempShape && activeTool==='angle') { tempShape.destroy(); tempShape=null; mainLayer.batchDraw(); } 
+        }
+        
+        function handleAngleClick(pos) {
+            if (activeTool !== 'angle') return;
+            if (angleStep === 0) { 
+                angleVertex = pos; angleStep = 1; 
+                tempShape = new Konva.Group({ name: 'annotation-group' }); setGroupDefaults(tempShape); mainLayer.add(tempShape); 
+                if (magnifierEnabled) { document.getElementById('mag-canvas').classList.remove('hidden'); updateMagnifier(angleVertex); }
+            } 
+            else if (angleStep === 1) { angleP1 = pos; angleStep = 2; } 
+            else if (angleStep === 2) {
+                const finishedShape = tempShape;
+                updateAngleShape(finishedShape, angleVertex, angleP1, pos);
+                finishedShape.setAttr('cadType', 'angle');
+                setTool('select'); makeGroupInteractive(finishedShape); selectNode(finishedShape); saveState(); 
+            }
+        }
+
+        function updateAngleShape(group, v, p1, p2, customText) {
+            group.destroyChildren(); 
+            const lCol = group.getAttr('cadLineColor'); const tCol = group.getAttr('cadTextColor');
+            const bgCol = group.getAttr('cadBgColor'); const bgA = group.getAttr('cadBgAlpha');
+            const lw = parseFloat(group.getAttr('cadLineWidth')); const fSize = group.getAttr('cadFontSize');
+            const dArr = getDashArray(group.getAttr('cadLineStyle')); const radius = parseFloat(group.getAttr('cadAngleRad'));
+
+            const t1 = Math.atan2(p1.y - v.y, p1.x - v.x); const t2 = Math.atan2(p2.y - v.y, p2.x - v.x);
+            let diff = t2 - t1; while (diff < 0) diff += 2*Math.PI; while (diff >= 2*Math.PI) diff -= 2*Math.PI;
+            const degVal = customText || (diff * 180 / Math.PI).toFixed(1) + '°';
+            group.setAttr('v', v); group.setAttr('p1', p1); group.setAttr('p2', p2); group.setAttr('cadText', degVal);
+            
+            group.add(new Konva.Line({ points: [v.x, v.y, v.x + (radius+15)*Math.cos(t1), v.y + (radius+15)*Math.sin(t1)], stroke: lCol, strokeWidth: lw, dash: dArr.length ? dArr : [4,4], hitStrokeWidth: 25 }));
+            group.add(new Konva.Line({ points: [v.x, v.y, v.x + (radius+15)*Math.cos(t2), v.y + (radius+15)*Math.sin(t2)], stroke: lCol, strokeWidth: lw, dash: dArr, hitStrokeWidth: 25 }));
+            group.add(new Konva.Arc({ x: v.x, y: v.y, innerRadius: radius, outerRadius: radius, angle: (diff * 180 / Math.PI), rotation: (t1 * 180 / Math.PI), stroke: lCol, strokeWidth: lw, dash: dArr, hitStrokeWidth: 25 }));
+            
+            const mid = t1 + diff/2; 
+            const lbl = createFramedLabel(degVal, lCol, tCol, bgCol, bgA, group.getAttr('cadFontFamily'), group.getAttr('cadShape'), group.getAttr('cadPadding'), lw, fSize);
+            lbl.position({ x: v.x + (radius+25)*Math.cos(mid), y: v.y + (radius+25)*Math.sin(mid) });
+            group.add(lbl);
+        }
+
+        function createEngineeringStamp(pos) {
+            const grp = new Konva.Group({ x: pos.x, y: pos.y, name: 'annotation-group engineering-stamp' });
+            grp.setAttr('cadType', 'stamp');
+            grp.setAttr('stampLine', document.getElementById('stamp-line-type').value);
+            grp.setAttr('stampColor', document.getElementById('stamp-color').value);
+            grp.setAttr('stampAlpha', document.getElementById('stamp-alpha').value);
+            grp.setAttr('stampFontSize', document.getElementById('stamp-font-size').value || 13);
+            
+            grp.setAttr('stampD1', document.getElementById('stamp-proj').value);
+            grp.setAttr('stampD2', document.getElementById('stamp-obj').value);
+            grp.setAttr('stampD3', document.getElementById('stamp-dims').value);
+            grp.setAttr('stampD4', document.getElementById('stamp-dev').value);
+
+            setTool('select'); drawStampInternals(grp); makeGroupInteractive(grp); mainLayer.add(grp); selectNode(grp); saveState(); 
+        }
+
+        // ВИПРАВЛЕНО: Нова двоповерхова архітектура штампа із захистом від накладання тексту
+        function drawStampInternals(grp) {
+            grp.destroyChildren();
+            const sLine = grp.getAttr('stampLine') === 'dashed' ? [6,4] : [];
+            const col = grp.getAttr('stampColor') || '#000';
+            const sAlpha = parseFloat(grp.getAttr('stampAlpha'));
+            const fSize = parseInt(grp.getAttr('stampFontSize')) || 13;
+            
+            const width = 420; 
+            const height = 110;
+            const halfW = width / 2;
+            const cellW = halfW - 16; // Ширина текстового поля з відступами
+            
+            // Головна рамка та фон
+            grp.add(new Konva.Rect({ width: width, height: height, fill: '#ffffff', opacity: sAlpha, stroke: col, strokeWidth: 2, dash: sLine }));
+            
+            // Горизонтальні та вертикальні перегородки
+            grp.add(new Konva.Line({ points: [0, 44, width, 44], stroke: col, strokeWidth: 1, dash: sLine })); 
+            grp.add(new Konva.Line({ points: [0, 88, width, 88], stroke: col, strokeWidth: 1, dash: sLine })); 
+            grp.add(new Konva.Line({ points: [halfW, 0, halfW, 88], stroke: col, strokeWidth: 1, dash: sLine }));
+            
+            // Міні-заголовки комірок (верхній поверх)
+            const lblStyle = { fontSize: 9, fontFamily: 'Chakra Petch', fontStyle: 'bold', fill: col, opacity: 0.55 };
+            grp.add(new Konva.Text({ x: 8, y: 5, text: "1. НАЗВА / ЛОКАЦІЯ:", ...lblStyle }));
+            grp.add(new Konva.Text({ x: halfW + 8, y: 5, text: "2. ТИП ОБ'ЄКТУ:", ...lblStyle }));
+            grp.add(new Konva.Text({ x: 8, y: 49, text: "3. ГАБАРИТИ:", ...lblStyle }));
+            grp.add(new Konva.Text({ x: halfW + 8, y: 49, text: "4. ВИКОНАВЕЦЬ:", ...lblStyle }));
+
+            // Значення полів (нижній поверх, з обрізанням при переповненні)
+            const valStyle = { fontSize: fSize, fontFamily: 'Chakra Petch', fill: col, width: cellW, height: 22, wrap: 'none', ellipsis: true };
+            grp.add(new Konva.Text({ x: 8, y: 20, text: grp.getAttr('stampD1') || '', fontStyle: 'bold', ...valStyle }));
+            grp.add(new Konva.Text({ x: halfW + 8, y: 20, text: grp.getAttr('stampD2') || '', ...valStyle }));
+            grp.add(new Konva.Text({ x: 8, y: 64, text: grp.getAttr('stampD3') || '', ...valStyle }));
+            grp.add(new Konva.Text({ x: halfW + 8, y: 64, text: grp.getAttr('stampD4') || '', ...valStyle }));
+
+            // Підвал штампа
+            grp.add(new Konva.Text({ x: 8, y: 94, text: "САПР «КОНТУР» // ІНЖЕНЕРНА РОЗМІТКА", fontSize: 10, fontFamily: 'Chakra Petch', fontStyle: 'bold', fill: col, opacity: 0.5 }));
+        }
+
+        // ---------------- INTERACTION ----------------
+        function makeGroupInteractive(group) {
+            const type = group.getAttr('cadType');
+            if (['textbox', 'stamp'].includes(type)) { group.draggable(true); } else { group.draggable(false); }
+            group.on('mousedown touchstart click tap', e => { e.cancelBubble = true; if (activeTool === 'select') selectNode(group); });
+            group.on('dragend', e => { if (['textbox', 'stamp'].includes(type)) { renderVertexHandles(group); saveState(); } });
+        }
+
+        function selectNode(node) {
+            deselectAll(); activeSelectedNode = node; const type = node.getAttr('cadType');
+            toggleMobileInspector(true);
+            const angleBlock = document.getElementById('angle-radius-block');
+            if (angleBlock) angleBlock.style.display = type === 'angle' ? 'block' : 'none';
+
+            if (['textbox', 'stamp'].includes(type)) { transformer.nodes([node]); } 
+            else if (['dimension', 'leader', 'angle'].includes(type)) { renderVertexHandles(node); }
+            
+            if (type === 'stamp') {
+                switchRightTab('stamp');
+                document.getElementById('stamp-line-type').value = node.getAttr('stampLine') || 'solid';
+                document.getElementById('stamp-color').value = node.getAttr('stampColor') || '#000000';
+                document.getElementById('stamp-alpha').value = node.getAttr('stampAlpha') !== undefined ? node.getAttr('stampAlpha') : 1.0;
+                const fs = node.getAttr('stampFontSize') || 13; document.getElementById('stamp-font-size').value = fs; document.getElementById('val-stamp-fs').innerText = fs;
+                
+                document.getElementById('stamp-proj').value = node.getAttr('stampD1') || '';
+                document.getElementById('stamp-obj').value = node.getAttr('stampD2') || '';
+                document.getElementById('stamp-dims').value = node.getAttr('stampD3') || '';
+                document.getElementById('stamp-dev').value = node.getAttr('stampD4') || '';
+            } else {
+                switchRightTab('element');
+                document.getElementById('prop-text').value = node.getAttr('cadText') || '';
+                document.getElementById('prop-line-color').value = node.getAttr('cadLineColor') || defLineColor;
+                document.getElementById('prop-text-color').value = node.getAttr('cadTextColor') || defTextColor;
+                document.getElementById('prop-bg-color').value = node.getAttr('cadBgColor') || defBgColor;
+                document.getElementById('prop-bg-alpha').value = node.getAttr('cadBgAlpha') !== undefined ? node.getAttr('cadBgAlpha') : defBgAlpha;
+                document.getElementById('prop-fontfamily').value = node.getAttr('cadFontFamily') || defFont;
+                document.getElementById('prop-shape').value = node.getAttr('cadShape') || defShape;
+                document.getElementById('prop-line-style').value = node.getAttr('cadLineStyle') || defLineStyle;
+                const fSize = node.getAttr('cadFontSize') || defFontSize; document.getElementById('prop-font-size').value = fSize; document.getElementById('val-font-size').innerText = fSize;
+                const padding = node.getAttr('cadPadding') || defPadding; document.getElementById('prop-padding').value = padding; document.getElementById('val-padding').innerText = padding;
+                const lw = node.getAttr('cadLineWidth') || defLineWidth; document.getElementById('prop-line-width').value = lw; document.getElementById('val-line-width').innerText = lw;
+                const aSize = node.getAttr('cadArrowSize') || defArrowSize; document.getElementById('prop-arrow-size').value = aSize; document.getElementById('val-arrow-size').innerText = aSize;
+                if (type === 'angle') { const rSize = node.getAttr('cadAngleRad') || defAngleRadius; document.getElementById('prop-angle-rad').value = rSize; document.getElementById('val-angle-rad').innerText = rSize; }
+            }
+            mainLayer.draw(); handlesLayer.draw();
+        }
+
+        function deselectAll() {
+            activeSelectedNode = null; transformer.nodes([]);
+            activeHandleAnchors.forEach(a => a.destroy()); activeHandleAnchors = []; 
+            toggleMobileInspector(false); handlesLayer.draw(); mainLayer.draw();
+        }
+
+        function updateActiveObjectProps(save = true) {
+            if (!activeSelectedNode) return;
+            const type = activeSelectedNode.getAttr('cadType'); if (type === 'stamp') return; 
+            activeSelectedNode.setAttr('cadText', document.getElementById('prop-text').value);
+            activeSelectedNode.setAttr('cadLineColor', document.getElementById('prop-line-color').value);
+            activeSelectedNode.setAttr('cadTextColor', document.getElementById('prop-text-color').value);
+            activeSelectedNode.setAttr('cadBgColor', document.getElementById('prop-bg-color').value);
+            activeSelectedNode.setAttr('cadBgAlpha', document.getElementById('prop-bg-alpha').value);
+            activeSelectedNode.setAttr('cadFontFamily', document.getElementById('prop-fontfamily').value);
+            activeSelectedNode.setAttr('cadFontSize', document.getElementById('prop-font-size').value);
+            activeSelectedNode.setAttr('cadPadding', document.getElementById('prop-padding').value);
+            activeSelectedNode.setAttr('cadShape', document.getElementById('prop-shape').value);
+            activeSelectedNode.setAttr('cadLineStyle', document.getElementById('prop-line-style').value);
+            activeSelectedNode.setAttr('cadLineWidth', document.getElementById('prop-line-width').value);
+            activeSelectedNode.setAttr('cadArrowSize', document.getElementById('prop-arrow-size').value);
+            activeSelectedNode.setAttr('cadAngleRad', document.getElementById('prop-angle-rad').value);
+            
+            if (type === 'dimension') updateDimensionShape(activeSelectedNode, activeSelectedNode.getAttr('p1'), activeSelectedNode.getAttr('p2'), activeSelectedNode.getAttr('cadText'));
+            else if (type === 'leader') updateLeaderShape(activeSelectedNode, activeSelectedNode.getAttr('p1'), activeSelectedNode.getAttr('p2'), activeSelectedNode.getAttr('cadText'));
+            else if (type === 'angle') updateAngleShape(activeSelectedNode, activeSelectedNode.getAttr('v'), activeSelectedNode.getAttr('p1'), activeSelectedNode.getAttr('p2'), activeSelectedNode.getAttr('cadText'));
+            else if (type === 'textbox') { 
+                activeSelectedNode.destroyChildren(); 
+                activeSelectedNode.add(createFramedLabel(activeSelectedNode.getAttr('cadText'), activeSelectedNode.getAttr('cadLineColor'), activeSelectedNode.getAttr('cadTextColor'), activeSelectedNode.getAttr('cadBgColor'), activeSelectedNode.getAttr('cadBgAlpha'), activeSelectedNode.getAttr('cadFontFamily'), activeSelectedNode.getAttr('cadShape'), activeSelectedNode.getAttr('cadPadding'), activeSelectedNode.getAttr('cadLineWidth'), activeSelectedNode.getAttr('cadFontSize'))); 
+            }
+            mainLayer.draw(); if (save) saveState();
+        }
+
+        function updateActiveStampProps(save = true) {
+            if (!activeSelectedNode || activeSelectedNode.getAttr('cadType') !== 'stamp') return;
+            activeSelectedNode.setAttr('stampLine', document.getElementById('stamp-line-type').value);
+            activeSelectedNode.setAttr('stampColor', document.getElementById('stamp-color').value);
+            activeSelectedNode.setAttr('stampAlpha', document.getElementById('stamp-alpha').value);
+            const fs = document.getElementById('stamp-font-size').value;
+            activeSelectedNode.setAttr('stampFontSize', fs); document.getElementById('val-stamp-fs').innerText = fs;
+            
+            activeSelectedNode.setAttr('stampD1', document.getElementById('stamp-proj').value);
+            activeSelectedNode.setAttr('stampD2', document.getElementById('stamp-obj').value);
+            activeSelectedNode.setAttr('stampD3', document.getElementById('stamp-dims').value);
+            activeSelectedNode.setAttr('stampD4', document.getElementById('stamp-dev').value);
+            
+            drawStampInternals(activeSelectedNode); mainLayer.draw(); if (save) saveState();
+        }
+
+        function renderVertexHandles(node) {
+            activeHandleAnchors.forEach(a => a.destroy()); activeHandleAnchors = [];
+            const type = node.getAttr('cadType');
+            const makeAnchor = (key, pos) => {
+                const groupX = node.x(); const groupY = node.y();
+                const a = new Konva.Circle({ x: pos.x + groupX, y: pos.y + groupY, radius: 14, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 3, draggable: true, hitStrokeWidth: 25 });
+                
+                a.on('dragstart', () => { if (magnifierEnabled) document.getElementById('mag-canvas').classList.remove('hidden'); });
+                a.on('dragmove', e => {
+                    e.cancelBubble = true; node.setAttr(key, { x: a.x() - node.x(), y: a.y() - node.y() });
+                    if (type === 'dimension') updateDimensionShape(node, node.getAttr('p1'), node.getAttr('p2'), node.getAttr('cadText'));
+                    else if (type === 'leader') updateLeaderShape(node, node.getAttr('p1'), node.getAttr('p2'), node.getAttr('cadText'));
+                    else if (type === 'angle') updateAngleShape(node, node.getAttr('v'), node.getAttr('p1'), node.getAttr('p2'), node.getAttr('cadText'));
+                    
+                    mainLayer.batchDraw(); 
+                    if (magnifierEnabled) updateMagnifier({ x: a.x(), y: a.y() });
+                });
+                a.on('dragend', () => { document.getElementById('mag-canvas').classList.add('hidden'); saveState(); }); 
+                handlesLayer.add(a); activeHandleAnchors.push(a);
+            };
+
+            if (['dimension', 'leader'].includes(type)) { makeAnchor('p1', node.getAttr('p1')); makeAnchor('p2', node.getAttr('p2')); }
+            else if (type === 'angle') { makeAnchor('v', node.getAttr('v')); makeAnchor('p1', node.getAttr('p1')); makeAnchor('p2', node.getAttr('p2')); }
+            handlesLayer.draw();
+        }
+
+        function deleteSelected() { if(activeSelectedNode) { activeSelectedNode.destroy(); deselectAll(); saveState(); } }
+
+        // ---------------- EXPORTS ----------------
+        function exportImage() {
+            deselectAll();
+            const oldScale = stage.scaleX(); const oldPos = stage.position();
+            const oldW = stage.width(); const oldH = stage.height();
+            stage.width(imgOrigWidth); stage.height(imgOrigHeight);
+            stage.scale({x: 1, y: 1}); stage.position({x: 0, y: 0}); stage.draw();
+            
+            const a = document.createElement('a'); a.download = 'КОНТУР_План.png';
+            a.href = stage.toDataURL({ pixelRatio: 2 });
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            
+            stage.width(oldW); stage.height(oldH);
+            stage.scale({x: oldScale, y: oldScale}); stage.position(oldPos); stage.draw();
+        }
+
+        function exportPDF() {
+            deselectAll();
+            const { jsPDF } = window.jspdf;
+            const oldScale = stage.scaleX(); const oldPos = stage.position();
+            const oldW = stage.width(); const oldH = stage.height();
+            stage.width(imgOrigWidth); stage.height(imgOrigHeight);
+            stage.scale({x: 1, y: 1}); stage.position({x: 0, y: 0}); stage.draw();
+            
+            const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+            const orientation = imgOrigWidth > imgOrigHeight ? 'landscape' : 'portrait';
+            const doc = new jsPDF({ orientation: orientation, unit: 'px', format: [imgOrigWidth, imgOrigHeight] });
+            
+            doc.addImage(dataUrl, 'PNG', 0, 0, imgOrigWidth, imgOrigHeight);
+            doc.save('КОНТУР_План.pdf');
+            
+            stage.width(oldW); stage.height(oldH);
+            stage.scale({x: oldScale, y: oldScale}); stage.position(oldPos); stage.draw();
+        }
+    </script>
+</body>
+</html>
